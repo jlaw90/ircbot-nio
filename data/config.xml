@@ -1,0 +1,23 @@
+<!DOCTYPE config [
+        <!ELEMENT config (server)*>
+        <!ELEMENT server (onconnect)*>
+        <!ATTLIST server
+                host CDATA #REQUIRED
+                name CDATA #IMPLIED
+                nick CDATA #IMPLIED
+                port CDATA #IMPLIED
+                realname CDATA #IMPLIED>
+        <!ELEMENT onconnect (cmd|loadscript)*>
+        <!ELEMENT cmd (#PCDATA)>
+        <!ELEMENT loadscript (#PCDATA)>
+        ]>
+<config>
+    <server host="irc.freenode.net" nick="CommodoreBE" port="6667">
+        <onconnect>
+            <cmd>PRIVMSG NickServ :IDENTIFY PASS</cmd>
+            <cmd>JOIN #commodore</cmd>
+            <loadscript>uno.rb</loadscript>
+            <loadscript>qdb.rb</loadscript>
+        </onconnect>
+    </server>
+</config>

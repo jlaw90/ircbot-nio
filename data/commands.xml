@@ -1,0 +1,403 @@
+<!DOCTYPE commands [
+        <!ELEMENT commands (command)*>
+        <!ELEMENT command (help|script)*>
+        <!ATTLIST command
+                groups CDATA #REQUIRED
+                name CDATA #REQUIRED
+                params CDATA #IMPLIED>
+        <!ELEMENT help (#PCDATA)>
+        <!ELEMENT script (#PCDATA)>
+        <!ATTLIST script
+                lang CDATA #REQUIRED
+                src CDATA #IMPLIED>
+        ]>
+<commands>
+    <command groups="admin" name="threadlist">
+        <help>
+            Lists all threads currently running in this jvm instance
+        </help>
+        <script lang="js">
+            var group = java.lang.Thread.currentThread().getThreadGroup();
+            var threads = java.lang.reflect.Array.newInstance(java.lang.Thread, group.activeCount());
+            group.enumerate(threads);
+            var str = "Threads: ";
+            for(thread in threads)
+                str += (thread != 0? ", ": "") + threads[thread].getId() + ":" + threads[thread].getName();
+            reply(str);
+        </script>
+    </command>
+    <command groups="admin" name="killthread" params="pid">
+        <help>
+            Kills the thread with the specified pid
+        </help>
+        <script lang="js">
+            var group = java.lang.Thread.currentThread().getThreadGroup();
+            var threads = java.lang.reflect.Array.newInstance(java.lang.Thread, group.activeCount());
+            group.enumerate(threads);
+            for(thread in threads)
+                if(threads[thread].getId() == pid) {
+                    threads[thread].stop();
+                    reply('Thread killed!');
+                }
+        </script>
+    </command>
+    <command groups="admin" name="rbthreadlist">
+        <help>
+            Lists all currently running threads under JRuby
+        </help>
+        <script lang="rb">
+            threads = Thread.list
+            str = []
+            count = threads.length
+            if count == 0
+              reply('No running JRuby threads')
+            else
+              threads.each { |t| str &lt;&lt; t.hash}
+              reply('Running threads: ' + str * ', ')
+            end
+        </script>
+    </command>
+    <command groups="admin" name="rbkillthread" params="pid">
+        <help>
+            Kills the JRuby thread with the specified PID (if any)
+        </help>
+        <script lang="rb">
+            threads = Thread.list
+            found = nil
+            $pid = $pid.to_i
+            threads.each {|t| found = t if t.hash == $pid;}
+            if found == nil
+              reply('No thread with the specified PID was found.')
+            else
+              begin
+                found.kill
+                reply('Thread with the specified PID was killed')
+              rescue
+                reply('Error killing thread...')
+              end
+            end
+        </script>
+    </command>
+    <command groups="admin" name="ignore" params="nick">
+        <help>
+            Instructs the bot to ignore the specified nickname.  (We automatically ignore non-identified users)
+        </help>
+        <script lang="rb">
+            import 'net.newbiehacker.bot.UserManager'
+            user = $irc.getUser($nick)
+            if user == nil
+              reply 'That user is not in the system.'
+            else
+              buser = UserManager.getUser(user, true)
+              if buser == nil
+                reply 'That user isn\'t registered and will be ignored anyway.'
+              else
+                buser.set('ignored', 'true')
+                reply $nick + ' is now being ignored.'
+              end
+            end
+        </script>
+    </command>
+    <command groups="admin" name="unignore" params="nick">
+        <help>
+            Instructs the bot to unignore the specified nickname.
+        </help>
+        <script lang="rb">
+            import 'net.newbiehacker.bot.UserManager'
+            user = $irc.getUser($nick)
+            if user == nil
+              reply 'That user is not in the system.'
+            else
+              buser = UserManager.getUser(user, true)
+              if buser == nil
+                reply 'That user isn\'t registered and will be ignored anyway.'
+              else
+                buser.set('ignored', 'false')
+                reply $nick + ' is no longer being ignored.'
+              end
+            end
+        </script>
+    </command>
+    <command groups="admin" name="memusage">
+        <help>
+            Displays the memory usage of the jvm (used/total/max/percentage)
+        </help>
+        <script lang="rb">
+            import java.lang.Runtime;
+
+            def friendly(val)
+              return (val / (1024 * 1024)).to_s + "MB" if val >= 1024 * 1024;
+              return (val / 1024).to_s + "kB" if val >= 1024;
+              return val.to_s + "B";
+            end
+
+            run = Runtime.getRuntime();
+            tot = run.totalMemory();
+            free = run.freeMemory();
+            max = run.maxMemory();
+            used = tot - free;
+            reply("Mem[Used:" + friendly(used) + "/Available:" + friendly(tot) + "/Max:" + friendly(max) + "/Percentage:" + ((used * 100) / tot).to_s + "%]");
+        </script>
+    </command>
+    <command groups="controller" name="op" params="nicks...?">
+        <help>
+            If nicks is present, will op the listed nicks (space seperated list), otherwise it will op the sender of
+            this command
+        </help>
+        <script lang="js">
+            if(!irc.onChannel(dest)) {
+                reply('You have to send this command from a channel!');
+            } else {
+                var rights = irc.getChannel(dest).getRights(irc.getUser());
+                if(rights == null || !(rights.contains(new Character('o')) || rights.contains(new Character('a')) || rights.contains(new Character('q'))))
+                    reply('I don\'t have enough channel rights to op people');
+                else if(params == 0)
+                    irc.sendModeChange(dest, '+o ' + user.getNick());
+                else {
+                    var users = nicks.split(' ');
+                    var str = '+';
+                    for(var i = 0; i &lt; users.length; i++) {
+                        str += 'o';
+                    }
+                    for(var i = 0; i &lt; users.length; i++) {
+                        str += ' ' + users[i];
+                    }
+                    irc.sendModeChange(dest, str);
+                }
+            }
+        </script>
+    </command>
+    <command groups="controller" name="deop" params="nicks...?">
+        <help>
+            If nicks is present, will deop the listed nicks (space seperated list), otherwise it will deop the sender of
+            this command
+        </help>
+        <script lang="js">
+            if(!irc.onChannel(dest)) {
+                reply('You have to send this command from a channel!');
+            } else {
+                var rights = irc.getChannel(dest).getRights(irc.getUser());
+                if(rights == null || !(rights.contains(new Character('o')) || rights.contains(new Character('a')) || rights.contains(new Character('q'))))
+                    reply('I don\'t have enough channel rights to op people');
+                else if(params == 0)
+                    irc.sendModeChange(dest, '-o ' + user.getNick());
+                else {
+                    var users = nicks.split(' ');
+                    var str = '-';
+                    for(var i = 0; i &lt; users.length; i++) {
+                        str += 'o';
+                    }
+                    for(var i = 0; i &lt; users.length; i++) {
+                        str += ' ' + users[i];
+                    }
+                    irc.sendModeChange(dest, str);
+                }
+            }
+        </script>
+    </command>
+    <command groups="public" name="calc" params="equation...">
+        <help>
+            Calculates the specified equation, valid operators are: *, +, -, &amp;, |, **, ^, ~, &lt;&lt;, &gt;&gt;, /, ==, !=, &lt;, &gt; (no variables, sorry)
+        </help>
+        <script lang="rb">
+            if $params == 0
+              reply 'No calculation specified'
+              return
+            end
+            calc = $equation
+            allowed = [' ', '*', '+', '-', '&amp;', '|', '^', '/', '(', ')', '.', '&lt;', '&gt;', '=', '~', '!']
+            10.times {|i| allowed &lt;&lt; i.to_s }
+            valid = true
+            calc.each_byte { |b|
+              if(!allowed.include?(b.chr))
+                valid = false
+              end }
+            if !valid
+              reply 'Invalid characters included in calculation string'
+              return
+            end
+            begin
+              r = (eval calc)
+              result = 'Result: ' + r.to_s
+            rescue
+              result = 'Error in calculation: ' + $!
+            end
+            if(result.length > 256)
+              reply 'Result of calculation is too long'
+              return
+            end
+            reply result
+        </script>
+    </command>
+    <command groups="controller" name="join" params="channel">
+        <help>
+            Makes the bot join the specified channel
+        </help>
+        <script lang="rb">
+            $irc.join $channel
+        </script>
+    </command>
+    <command groups="public" name="seen" params="nick">
+        <help>
+            Tells you the last time the bot saw the specified nickname perform an action
+        </help>
+        <script lang="rb">
+            import 'net.newbiehacker.commodore.MessageTransceiverType'
+
+            u = $irc.getUser($nick)
+            if u.nil?
+              reply 'Haven\'t seen that user before, sorry!'
+              return
+            end
+
+            if $nick == $irc.getUser().getNick()
+              reply 'I\'m right here you idiot!'
+              return
+            end
+
+            if u.onChannel($dest)
+              reply 'He\'s right here you idiot!'
+              return
+            end
+
+            difference = (Time.now - Time.at(u.idleSince.getTime() / 1000)).round
+            secs = difference % 60
+            difference = (difference - secs) / 60
+            mins = difference % 60
+            difference = (difference - mins) / 60
+            hrs = difference % 24
+            difference = (difference - hrs) / 24
+            days = difference % 7
+            weeks = (difference - days) / 7
+
+            str = $nick + ' was last seen '
+            arr = Array.new
+            arr &lt;&lt; weeks.to_s + ' week' + (weeks != 1? 's': '') if weeks != 0
+            arr &lt;&lt; days.to_s + ' day' + (days != 1? 's': '') if days != 0
+            arr &lt;&lt; hrs.to_s + ' hour' + (hrs != 1? 's': '') if hrs != 0
+            arr &lt;&lt; mins.to_s + ' minute' + (mins != 1? 's': '') if mins != 0
+            arr &lt;&lt; secs.to_s + ' second' + (secs != 1? 's': '') if secs != 0
+            arr.length.times {|i| str += arr[i] + ((i == arr.length - 1)? '': (i == arr.length - 2)? ' and ': ', ')}
+            str += ' ago.'
+            puts str
+
+            reply str
+        </script>
+    </command>
+    <command groups="controller" name="update" params="nick">
+        <help>
+            Re-whos a nick to update data about that user
+        </help>
+        <script lang="rb">
+            u = $irc.getUser($nick)
+            return if u.nil?
+            $irc.sendRaw('WHO ' + u.getNick)
+            $irc.sendRaw('WHOIS ' + u.getNick)
+        </script>
+    </command>
+    <command groups="public" name="japi" params="clazz">
+        <help>
+            Links you to the Java API documentation for the class specified by 'clazz'
+        </help>
+        <script lang="js">
+            var nick = user.getNick();
+            clazz = clazz.toLowerCase().replace('.', '/');
+            var paths = java.lang.System.getProperty('sun.boot.class.path').replace('\\', '/').split(java.lang.System.getProperty('path.separator'))
+            var path = null;
+            for(var i = 0; i &lt; paths.length; i++) {
+                if(paths[i].endsWith('/rt.jar')) {
+                    path = paths[i];
+                    break;
+                }
+            }
+            if(path == null) {
+                reply(nick + ': Error: couldn\'t find rt.jar in the classpath, aborting.');
+            } else {
+                var jf = new java.util.jar.JarFile(path);
+                var en = jf.entries();
+                var matches = new java.util.ArrayList();
+                while(en.hasMoreElements()) {
+                    var name = en.nextElement().getName().replace('\\', '/');
+                    if(name.toLowerCase().endsWith('/' + clazz.toLowerCase() + '.class')) {
+                        var cname = name.replace('/', '.').substring(0, name.length() - 6);
+                        if(cname.startsWith('java') || cname.startsWith('javax') || cname.startsWith('org'))
+                            matches.add(cname);
+                    }
+                }
+                if(matches.size() == 0)
+                    reply(nick + ': No class found with that name, did you spell it correctly?');
+                else if(matches.size() == 1)
+                    reply(nick + ': http://java.sun.com/javase/6/docs/api/' + matches.get(0).replace('.', '/') + '.html');
+                else {
+                    var str = matches.toString();
+                    str = str.substring(1, str.length() - 1);
+                    var idx = str.lastIndexOf(',');
+                    str = str.substring(0, idx) + ' or' + str.substring(idx + 1, str.length());
+                    reply(nick + ': Ambiguous results, try: ' + str);
+                }
+            }
+        </script>
+    </command>
+    <command groups="admin" name="rehash">
+        <help>
+            Reloads all configuration data.
+        </help>
+        <script lang="js">
+            net.newbiehacker.bot.CommandManager.load();
+            net.newbiehacker.bot.UserManager.load();
+            net.newbiehacker.bot.GroupManager.load();
+            reply('Everything loaded (check command line in case of errors)');
+
+        </script>
+    </command>
+
+    <!-- External scripts //-->
+    <command groups="admin" name="hangman">
+        <help>
+            Loads the hangman script
+        </help>
+        <script lang="rb" src="hangman.rb"/>
+    </command>
+    <command groups="admin" name="uno">
+        <help>
+            Loads the uno script
+        </help>
+        <script lang="rb" src="uno.rb" />
+    </command>
+    <command groups="admin" name="qdb">
+        <help>
+            Loads the qdb script
+        </help>
+        <script lang="rb" src="qdb.rb" />
+    </command>
+    <command groups="admin" name="mshelp">
+        <help>
+            Loads the moparscape help script
+        </help>
+        <script lang="rb" src="moparscape_help.rb" />
+    </command>
+
+    <!-- Shared commands for engines //-->
+    <command groups="public" name="common.js">
+        <script lang="js" src="common.js"/>
+    </command>
+    <command groups="public" name="common.rb">
+        <script lang="rb" src="common.rb"/>
+    </command>
+
+    <!-- Stub script definitions (implemented in java, these are here for the help method... //-->
+    <command groups="admin" name="eval" params="engine, script...">
+        <help>
+            Evaluates the specified script with the specified script engine implementation.  Displays the result of the
+            evaluation to the invoker over IRC
+        </help>
+        <script lang="internal"/>
+    </command>
+    <command groups="public" name="help" params="command?">
+        <help>
+            Displays help information for commands.  If command parameter is specified, it displays information about
+            that command, including parameter information
+        </help>
+        <script lang="internal"/>
+    </command>
+</commands>

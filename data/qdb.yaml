@@ -1,0 +1,12 @@
+---
+- !ruby/object:QuoteDatabase::Quote
+  channel: "#bots"
+  contributer: newbiehacker
+  quote: "Error (in RUBY): divided by 0"
+  quoter: CommodoreJ
+  server: irc.moparisthebest.com
+  time: 2010-06-21 06:15:37.212000 +01:00
+  vminus: 0
+  voters:
+    - newbiehacker
+  vplus: 1
